@@ -356,7 +356,7 @@ class OneHotEncoding(FeatureEngineeringStrategy):
         features (list): The list of categorical features to apply the one-hot encoding to.
         """
         self.features = features
-        self.encoder = OneHotEncoder(sparse_output=False, drop="first")
+        self.encoder = OneHotEncoder(sparse_output=False)
 
     def apply_transformation(self, df: pd.DataFrame) -> pd.DataFrame:
         """

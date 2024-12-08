@@ -21,6 +21,9 @@ TVaritAssignment2/
 |   ├── data_eda.py
 |   └── feature_engineering.py
 └── DSData_Assignments 1.csv
+└── main.ipynb
+└── logs.log
+└── Assignment 2.pdf
 ```
 
 ### File Descriptions
@@ -42,6 +45,7 @@ TVaritAssignment2/
     - **test_model.py**: Contains classes and methods for evaluating regression models, including metrics calculation and plotting.
 
 - **DSData_Assignments 1.csv**: The dataset used for the regression tasks in the pipeline.
+- **main.ipynb**: Jupyter notebook containing the code for the project.
 
 ## Getting Started
 

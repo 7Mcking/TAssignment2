@@ -6,17 +6,15 @@ from catboost import CatBoostRegressor
 from lightgbm import LGBMRegressor
 from numpy import mean, std
 import pandas as pd
-import pip
 from sklearn.base import RegressorMixin
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.feature_selection import RFE
-from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import  RepeatedKFold, cross_val_score
+from sklearn.linear_model import Lasso, LinearRegression
+from sklearn.model_selection import RepeatedKFold, cross_val_score, GridSearchCV
 from sklearn.neural_network import MLPRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from xgboost import XGBRegressor
-from sklearn.model_selection import GridSearchCV
 
 # Setup logging configuration
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -41,7 +39,7 @@ class ModelBuildingStrategy(ABC):
 
 # Concrete Strategy for Linear Regression using scikit-learn
 class LinearRegressionStrategy(ModelBuildingStrategy):
-    def build_and_train_model(self, X_train: pd.DataFrame, y_train: pd.Series, param_grid=None,*args, **kwarg) -> Pipeline:
+    def build_and_train_model(self, X_train: pd.DataFrame, y_train: pd.Series, param_grid=None, *args, **kwargs) -> Pipeline:
         """
         Builds and trains a linear regression model using scikit-learn.
 
@@ -60,7 +58,7 @@ class LinearRegressionStrategy(ModelBuildingStrategy):
 
         logging.info("Initializing Linear Regression model with scaling.")
 
-        rfe = RFE(estimator=LinearRegression(), n_features_to_select=10)
+        rfe = RFE(estimator=LinearRegression(), n_features_to_select=12)
         
         # Creating a pipeline with standard scaling and linear regression
         pipeline = Pipeline(
@@ -73,14 +71,14 @@ class LinearRegressionStrategy(ModelBuildingStrategy):
         logging.info("Training Linear Regression model.")
         pipeline.fit(X_train, y_train)  # Fit the pipeline with training data
         cv = RepeatedKFold(n_splits=10, n_repeats=3, random_state=1)
-        n_scores = cross_val_score(pipeline, X_train, y_train, scoring='neg_root_mean_squared_error', cv=cv, n_jobs=-1, error_score='raise')
-        print('MSE: %.3f (%.3f)' % (mean(n_scores), std(n_scores)))
+        n_scores = cross_val_score(pipeline, X_train, y_train, scoring='neg_mean_absolute_error', cv=cv, n_jobs=-1, error_score='raise')
+        print('MAE: %.3f (%.3f)' % (mean(n_scores), std(n_scores)))
 
         logging.info("Model training completed.")
         return pipeline
     
 class RandomForestRegressionStrategy(ModelBuildingStrategy):
-    def build_and_train_model(self, X_train: pd.DataFrame, y_train: pd.Series, param_grid=None,*args, **kwarg) -> Pipeline:
+    def build_and_train_model(self, X_train: pd.DataFrame, y_train: pd.Series, param_grid=None, *args, **kwargs) -> Pipeline:
         """
         Builds and trains a random forest regression model using scikit-learn.
 
@@ -100,7 +98,7 @@ class RandomForestRegressionStrategy(ModelBuildingStrategy):
         logging.info("Initializing Random Forest Regression model with scaling.")
         
         if param_grid is None:
-            rfe= RFE(estimator=RandomForestRegressor(), n_features_to_select=10)
+            rfe= RFE(estimator=RandomForestRegressor(), n_features_to_select=12)
             # Creating a pipeline with standard scaling and Random Forest Regression
             pipeline = Pipeline(
                 [
@@ -112,14 +110,14 @@ class RandomForestRegressionStrategy(ModelBuildingStrategy):
             logging.info("Training Random Forest Regression model.")
             pipeline.fit(X_train, y_train)  # Fit the pipeline with training data
             cv = RepeatedKFold(n_splits=10, n_repeats=3, random_state=1)
-            n_scores = cross_val_score(pipeline, X_train, y_train, scoring='neg_root_mean_squared_error', cv=cv, n_jobs=-1, error_score='raise')
-            print('neg_root_mean_squared_error: %.3f (%.3f)' % (mean(n_scores), std(n_scores)))
+            n_scores = cross_val_score(pipeline, X_train, y_train, scoring='neg_mean_absolute_error', cv=cv, n_jobs=-1, error_score='raise')
+            print('neg_mean_absolute_error: %.3f (%.3f)' % (mean(n_scores), std(n_scores)))
 
             logging.info("Model training completed.")
             return pipeline
         else:
             param_grid = param_grid
-            rfe= RFE(estimator=RandomForestRegressor(), n_features_to_select=10)
+            rfe= RFE(estimator=RandomForestRegressor(), n_features_to_select=12)
             # Creating a pipeline with standard scaling and Random Forest Regression
             pipeline = Pipeline(
                 [
@@ -135,7 +133,7 @@ class RandomForestRegressionStrategy(ModelBuildingStrategy):
             return best_pipeline
 
 class CatBoostRegressionStrategy(ModelBuildingStrategy):
-    def build_and_train_model(self, X_train: pd.DataFrame, y_train: pd.Series, param_grid=None,*args, **kwargs) -> Pipeline:
+    def build_and_train_model(self, X_train: pd.DataFrame, y_train: pd.Series, param_grid=None, *args, **kwargs) -> Pipeline:
         """
         Builds and trains a CatBoost regression model using scikit-learn.
 
@@ -154,20 +152,22 @@ class CatBoostRegressionStrategy(ModelBuildingStrategy):
 
         logging.info("Initializing CatBoost Regression model.")
         
-        rfe = RFE(estimator=CatBoostRegressionStrategy(), n_features_to_select=10)
+        rfe = RFE(estimator=CatBoostRegressor(), n_features_to_select=12)
         # Define the parameter grid for CatBoost
         if param_grid is None:
-            param_grid = {
-            'model__iterations': [100, 200, 500],
-            'model__depth': [4, 6, 8, 10],
-            'model__learning_rate': [0.01, 0.05, 0.1],
-            'model__l2_leaf_reg': [1, 3, 5, 7],
-            'model__border_count': [32, 50, 100],
-            'model__bagging_temperature': [0, 1, 2],
-            'model__random_strength': [1, 2, 5],
-            'model__one_hot_max_size': [2, 10, 20],
-            'model__random_state': [42]
-            }
+            pipeline = Pipeline(
+                [
+                    ("rfe", rfe),
+                    ("model", CatBoostRegressor(*args, **kwargs)),  # CatBoost regression model
+                ]
+            )
+            logging.info("Training CatBoost Regression model.")
+            pipeline.fit(X_train, y_train)
+            cv = RepeatedKFold(n_splits=10, n_repeats=3, random_state=1)
+            n_scores = cross_val_score(pipeline, X_train, y_train, scoring='neg_mean_absolute_error', cv=cv, n_jobs=-1, error_score='raise')
+            print('neg_mean_absolute_error: %.3f (%.3f)' % (mean(n_scores), std(n_scores)))
+            logging.info("Model training completed.")
+            return pipeline
         else:
             param_grid = param_grid
 
@@ -214,7 +214,7 @@ class LGBMRegressionStrategy(ModelBuildingStrategy):
 
         logging.info("Initializing LightGBM Regression model.")
 
-        rfe = RFE(estimator=LGBMRegressor(), n_features_to_select=10)
+        rfe = RFE(estimator=LGBMRegressor(), n_features_to_select=12)
         
         if param_grid is None:
             # Creating a pipeline with LightGBM regression model
@@ -229,8 +229,8 @@ class LGBMRegressionStrategy(ModelBuildingStrategy):
             pipeline.fit(X_train, y_train)  # Fit the pipeline with training data
             
             cv = RepeatedKFold(n_splits=10, n_repeats=3, random_state=1)
-            n_scores = cross_val_score(pipeline, X_train, y_train, scoring='neg_root_mean_squared_error', cv=cv, n_jobs=-1, error_score='raise')
-            print('neg_root_mean_squared_error: %.3f (%.3f)' % (mean(n_scores), std(n_scores)))
+            n_scores = cross_val_score(pipeline, X_train, y_train, scoring='neg_mean_absolute_error', cv=cv, n_jobs=-1, error_score='raise')
+            print('neg_mean_absolute_error: %.3f (%.3f)' % (mean(n_scores), std(n_scores)))
             
             logging.info("Model training completed.")
             return pipeline
@@ -284,8 +284,8 @@ class XGBRegressionStrategy(ModelBuildingStrategy):
             logging.info("Training XGBoost Regression model.")
             pipeline.fit(X_train, y_train)  # Fit the pipeline with training data
             cv = RepeatedKFold(n_splits=10, n_repeats=3, random_state=1)
-            n_scores = cross_val_score(pipeline, X_train, y_train, scoring='neg_root_mean_squared_error', cv=cv, n_jobs=-1, error_score='raise')
-            print('neg_root_mean_squared_error: %.3f (%.3f)' % (mean(n_scores), std(n_scores)))
+            n_scores = cross_val_score(pipeline, X_train, y_train, scoring='neg_mean_absolute_error', cv=cv, n_jobs=-1, error_score='raise')
+            print('neg_mean_absolute_error: %.3f (%.3f)' % (mean(n_scores), std(n_scores)))
             
             logging.info("Model training completed.")
             return pipeline
@@ -306,7 +306,7 @@ class XGBRegressionStrategy(ModelBuildingStrategy):
             return best_pipeline
     
 class NNRegressionStrategy(ModelBuildingStrategy):
-    def build_and_train_model(self, X_train: pd.DataFrame, y_train: pd.Series, param_grid=None,*args, **kwargs) -> Pipeline:
+    def build_and_train_model(self, X_train: pd.DataFrame, y_train: pd.Series, param_grid=None, *args, **kwargs) -> Pipeline:
         """
         Builds and trains a Neural Network regression model using scikit-learn.
 
@@ -325,14 +325,14 @@ class NNRegressionStrategy(ModelBuildingStrategy):
 
         logging.info("Initializing Neural Network Regression model.")
 
-        rfe = RFE(estimator=RandomForestRegressor(), n_features_to_select=10)
+        rfe = RFE(estimator=RandomForestRegressor(), n_features_to_select=12)
         
         if param_grid is None:
         
             # Creating a pipeline with Neural Network regression model
             pipeline = Pipeline(
                 [   
-                    ("rfe", rfe)
+                    ("rfe", rfe),
                     ("model", MLPRegressor()),  # Neural Network regression model
                 ]
             )
@@ -341,7 +341,7 @@ class NNRegressionStrategy(ModelBuildingStrategy):
             pipeline.fit(X_train, y_train)  # Fit the pipeline with training data
             cv = RepeatedKFold(n_splits=10, n_repeats=3, random_state=1)
             n_scores = cross_val_score(pipeline, X_train, y_train, scoring='mean_squared_error', cv=cv, n_jobs=-1, error_score='raise')
-            print('neg_root_mean_squared_error: %.3f (%.3f)' % (mean(n_scores), std(n_scores)))
+            print('neg_mean_absolute_error: %.3f (%.3f)' % (mean(n_scores), std(n_scores)))
 
             logging.info("Model training completed.")
             return pipeline
@@ -351,7 +351,7 @@ class NNRegressionStrategy(ModelBuildingStrategy):
             # Creating a pipeline with Neural Network regression model
             pipeline = Pipeline(
                 [   
-                    ("rfe", rfe)
+                    ("rfe", rfe),
                     ("model", MLPRegressor()),  # Neural Network regression model
                 ]
             )
@@ -385,7 +385,7 @@ class ModelBuilder:
         logging.info("Switching model building strategy.")
         self._strategy = strategy
 
-    def build_model(self, X_train: pd.DataFrame, y_train: pd.Series, *args, **kwargs) -> RegressorMixin:
+    def build_model(self, X_train: pd.DataFrame, y_train: pd.Series, param_grid=None, *args, **kwargs) -> RegressorMixin:
         """
         Executes the model building and training using the current strategy.
 
@@ -397,4 +397,4 @@ class ModelBuilder:
         RegressorMixin: A trained scikit-learn model instance.
         """
         logging.info("Building and training the model using the selected strategy.")
-        return self._strategy.build_and_train_model(X_train, y_train, param_grid=None,*args, **kwargs)
+        return self._strategy.build_and_train_model(X_train, y_train, param_grid=param_grid, *args, **kwargs)
