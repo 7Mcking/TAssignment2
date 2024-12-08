@@ -1,0 +1,10 @@
+pycaret[full]
+seaborn
+jupyter
+tensorflow
+smogn
+imbalanced-learn
+xgboost
+apache-airflow
+mlflow
+
