@@ -1,5 +1,3 @@
-# README.md
-
 ## Project Overview
 
 This project is a machine learning pipeline for regression tasks, utilizing various regression models and logging results with MLflow. The pipeline is orchestrated using Apache Airflow.
