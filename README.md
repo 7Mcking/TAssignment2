@@ -1,5 +1,3 @@
-# README.md
-
 ## Project Overview
 
 This project is a machine learning pipeline for regression tasks, utilizing various regression models and logging results with MLflow. The pipeline is orchestrated using Apache Airflow.
@@ -59,7 +57,7 @@ TVaritAssignment2/
 
 1. Clone the repository:
      ```sh
-     git clone https://github.com/yourusername/TVaritAssignment2.git
+     git clone https://github.com/7Mcking/TAssignment2.git
      cd TVaritAssignment2
      ```
 
